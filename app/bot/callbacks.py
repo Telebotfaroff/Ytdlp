@@ -10,6 +10,7 @@ from aiogram.types import CallbackQuery, Message
 from app.bot.keyboards.media import media_keyboard
 from app.media.ffmpeg import create_screenshots, create_trim
 from app.media.resolver import MediaResolver
+from app.upload.gofile import GoFileUploader, UploadError
 from app.media.session import (
     create_selection,
     create_filename_pending,
@@ -139,3 +140,36 @@ async def text_action_handler(message: Message) -> None:
         await message.answer("✅ Trim complete.")
     except Exception as exc:
         await message.answer(f"❌ Trim failed: {type(exc).__name__}: {exc}")
+
+
+@router.callback_query(lambda q: q.data and q.data.startswith("gofile:"))
+async def gofile_callback(query: CallbackQuery) -> None:
+    token = query.data.split(":", 1)[1]
+    selection = get_processing(token)
+    if not selection or selection.user_id != query.from_user.id:
+        await query.answer("This media session is unavailable.", show_alert=True)
+        return
+
+    await query.answer("Starting GoFile upload...")
+    status = await query.message.answer("☁️ Uploading to GoFile...")
+
+    last = {"time": 0.0}
+
+    def progress(sent: int, total: int, speed: float, eta: int | None) -> None:
+        import time
+        now = time.monotonic()
+        if now - last["time"] < 1.5 and sent < total:
+            return
+        last["time"] = now
+        percent = sent / total * 100 if total else 0
+        text = f"☁️ GoFile upload... {percent:.1f}%\n📦 {sent / 1024 / 1024:.1f} / {total / 1024 / 1024:.1f} MB\n⚡ {speed / 1024 / 1024:.2f} MB/s"
+        if eta is not None:
+            text += f"\n⏱ ETA: {eta}s"
+        import asyncio
+        asyncio.create_task(status.edit_text(text))
+
+    try:
+        link = await GoFileUploader().upload(selection.file_path, progress=progress)
+        await status.edit_text(f"✅ GoFile upload complete.\n\n{link}")
+    except Exception as exc:
+        await status.edit_text(f"❌ GoFile upload failed: {type(exc).__name__}: {exc}")
