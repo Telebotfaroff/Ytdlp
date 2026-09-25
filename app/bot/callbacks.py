@@ -1,4 +1,4 @@
-""""Callbacks for screenshots, trimming, and custom filenames."""
+"""Callbacks for screenshots, trimming, and custom filenames."""
 
 from __future__ import annotations
 
@@ -214,18 +214,18 @@ async def gofile_callback(query: CallbackQuery) -> None:
         last["time"] = now
         percent = sent / total * 100 if total else 0
         text = (
-            f"☁️ GoFile upload... {percent:.1f}%\\n"
-            f"📦 {sent / 1024 / 1024:.1f} / {total / 1024 / 1024:.1f} MB\\n"
+            f"☁️ GoFile upload... {percent:.1f}%\n"
+            f"📦 {sent / 1024 / 1024:.1f} / {total / 1024 / 1024:.1f} MB\n"
             f"⚡ {speed / 1024 / 1024:.2f} MB/s"
         )
         if eta is not None:
-            text += f"\\n⏱ ETA: {eta}s"
+            text += f"\n⏱ ETA: {eta}s"
         import asyncio
         asyncio.create_task(status.edit_text(text))
 
     try:
         link = await GoFileUploader().upload(selection.file_path, progress=progress)
-        await status.edit_text(f"✅ GoFile upload complete.\\n\\n{link}")
+        await status.edit_text(f"✅ GoFile upload complete.\n\n{link}")
     except Exception as exc:
         logger.exception("GoFile upload failed")
         await status.edit_text(f"❌ GoFile upload failed: {type(exc).__name__}: {exc}")
