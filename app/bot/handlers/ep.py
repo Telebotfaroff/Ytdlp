@@ -1,178 +1,78 @@
-"""Eporner search and download command."""
+"""Search command handler with one paginated result card."""
 
 from __future__ import annotations
 
-import asyncio
 import logging
-from pathlib import Path
-from time import monotonic
-from uuid import uuid4
 
 from aiogram import Router
 from aiogram.filters import Command, CommandObject
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
-from eporner_api import Client, DownloadConfigRAW, make_iterator_config
-import yt_dlp
+from aiogram.types import Message
 
-from app.config.settings import settings
-from app.upload.telegram import get_telegram_uploader
+from eporner_api import Client, make_iterator_config
+
+from app.bot.keyboards.search import result_keyboard
+from app.bot.search.session import SearchResult, cleanup, create_session
 
 router = Router(name="eporner")
 logger = logging.getLogger("ytdlp.eporner")
-
-_RESULTS: dict[str, tuple[str, str, float]] = {}
-_TTL = 3600
-
-
-def _cleanup() -> None:
-    now = monotonic()
-    for token, (_, _, created) in list(_RESULTS.items()):
-        if now - created > _TTL:
-            _RESULTS.pop(token, None)
-
-
-def _keyboard(token: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="⬇️ Download", callback_data=f"epdl:{token}")]
-        ]
-    )
+_LIMIT = 20
 
 
 @router.message(Command("ep"))
-async def eporner_search(message: Message, command: CommandObject) -> None:
+async def search_handler(message: Message, command: CommandObject) -> None:
     query = (command.args or "").strip()
     if not query:
-        await message.answer("Usage: /ep <search query>\n\nExample: /ep demo")
+        await message.answer("Usage: /ep <search query>")
         return
 
-    status = await message.answer(f"🔎 Searching Eporner for: {query}")
-    _cleanup()
+    status = await message.answer(f"🔎 Searching for: {query}")
+    cleanup()
 
     try:
-        client = Client()
-        iterator_config = make_iterator_config(load_specific_sources=("api",))
-        stream = client.search_videos(
+        stream = Client().search_videos(
             query=query,
             sorting_gay="0",
             sorting_order="latest",
             sorting_low_quality="1",
-            per_page=5,
+            per_page=_LIMIT,
             pages=1,
-            iterator_config=iterator_config,
+            iterator_config=make_iterator_config(load_specific_sources=("api",)),
         )
 
-        count = 0
-        async for result in stream:
-            video = result.unwrap()
-            title = getattr(video, "title", None) or "Untitled"
+        results = []
+        async for item in stream:
+            video = item.unwrap()
             url = getattr(video, "url", None)
-            thumbnail = getattr(video, "thumbnail", None)
             if not url:
                 continue
-
-            token = uuid4().hex[:12]
-            _RESULTS[token] = (url, title, monotonic())
-            count += 1
-
-            caption = f"🎬 {title}"
-            if thumbnail:
-                try:
-                    await message.answer_photo(
-                        photo=thumbnail,
-                        caption=caption,
-                        reply_markup=_keyboard(token),
-                    )
-                except Exception:
-                    await message.answer(caption, reply_markup=_keyboard(token))
-            else:
-                await message.answer(caption, reply_markup=_keyboard(token))
-
-            if count >= 5:
+            results.append(
+                SearchResult(
+                    title=getattr(video, "title", None) or "Untitled",
+                    url=url,
+                    thumbnail=getattr(video, "thumbnail", None),
+                )
+            )
+            if len(results) >= _LIMIT:
                 break
 
-        if count == 0:
-            await status.edit_text("❌ No Eporner results found.")
+        if not results:
+            await status.edit_text("❌ No results found.")
+            return
+
+        token = create_session(message.from_user.id, "E", query, results)
+        result = results[0]
+        caption = f"🎬 {result.title}\n\n🔎 E\n📄 Result 1 / {len(results)}"
+        markup = result_keyboard(token, 0, len(results))
+
+        if result.thumbnail:
+            try:
+                await message.answer_photo(photo=result.thumbnail, caption=caption, reply_markup=markup)
+            except Exception:
+                await message.answer(caption, reply_markup=markup)
         else:
-            await status.edit_text(f"✅ Found {count} result(s).")
+            await message.answer(caption, reply_markup=markup)
+
+        await status.edit_text(f"✅ Found {len(results)} result(s).")
     except Exception as exc:
-        logger.exception("Eporner search failed")
-        await status.edit_text(
-            f"❌ Eporner search failed: {type(exc).__name__}: {exc}"
-        )
-
-
-@router.callback_query(lambda query: query.data and query.data.startswith("epdl:"))
-async def eporner_download(query: CallbackQuery) -> None:
-    token = query.data.split(":", 1)[1]
-    entry = _RESULTS.get(token)
-    if not entry:
-        await query.answer("This result expired. Search again with /ep.", show_alert=True)
-        return
-
-    url, title, _ = entry
-    _RESULTS.pop(token, None)
-    await query.answer("Starting download...")
-    status = await query.message.answer(f"⬇️ Downloading:\n{title}")
-
-    try:
-        settings.prepare_directories()
-        before = {p.resolve() for p in settings.download_dir.iterdir() if p.is_file()}
-
-        file_path = None
-
-        try:
-            client = Client()
-            video = await client.get_video(url, load_html=True, load_api=True)
-            config = DownloadConfigRAW(
-                quality="best",
-                path=str(settings.download_dir),
-                no_title=False,
-            )
-            await video.download(config, mode="mp4_h264")
-            candidates = [
-                p for p in settings.download_dir.iterdir()
-                if p.is_file() and p.resolve() not in before
-            ]
-            if candidates:
-                file_path = max(candidates, key=lambda p: p.stat().st_mtime)
-        except Exception as api_exc:
-            logger.warning("Eporner API download failed; trying yt-dlp fallback: %s", api_exc)
-
-        if file_path is None:
-            def _yt_dlp_download() -> Path:
-                output_template = str(settings.download_dir / "%(title)s.%(ext)s")
-                options = {
-                    "quiet": True,
-                    "no_warnings": False,
-                    "noplaylist": True,
-                    "format": "bestvideo*+bestaudio/best",
-                    "merge_output_format": "mp4",
-                    "outtmpl": output_template,
-                }
-                with yt_dlp.YoutubeDL(options) as ydl:
-                    ydl.download([url])
-                candidates = [
-                    p for p in settings.download_dir.iterdir()
-                    if p.is_file() and p.resolve() not in before
-                ]
-                if not candidates:
-                    raise FileNotFoundError("Neither Eporner API nor yt-dlp produced a file")
-                return max(candidates, key=lambda p: p.stat().st_mtime)
-
-            file_path = await asyncio.to_thread(_yt_dlp_download)
-        if file_path.stat().st_size > settings.max_telegram_file_size:
-            raise ValueError("Downloaded file is larger than the configured 2 GB Telegram limit.")
-
-        await status.edit_text("📤 Uploading to Telegram...")
-        await get_telegram_uploader().upload_document(
-            chat_id=query.from_user.id,
-            path=file_path,
-            caption=file_path.name,
-        )
-        await status.edit_text(f"✅ Download complete.\n\n{file_path.name}")
-    except Exception as exc:
-        logger.exception("Eporner download failed")
-        await status.edit_text(
-            f"❌ Eporner download failed: {type(exc).__name__}: {exc}"
-        )
+        logger.exception("Search failed")
+        await status.edit_text(f"❌ Search failed: {type(exc).__name__}: {exc}")
