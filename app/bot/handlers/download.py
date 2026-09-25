@@ -1,4 +1,4 @@
-"""Download selection and cancellation callbacks."""
+"""Download selection, cancellation, and Telegram upload callbacks."""
 
 from __future__ import annotations
 
@@ -6,9 +6,10 @@ import asyncio
 import time
 
 from aiogram import Router
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, FSInputFile
 
 from app.bot.keyboards.download import cancel_download_keyboard
+from app.config.settings import settings
 from app.download.engine import DownloadEngine
 from app.download.jobs import DownloadCancelled, create_job, get_job, remove_job
 from app.media.session import pop_selection
@@ -53,7 +54,6 @@ async def quality_callback(query: CallbackQuery) -> None:
 
     loop = asyncio.get_running_loop()
     last_update = {"time": 0.0, "text": ""}
-    last_data = {"data": None}
 
     def progress(data: dict) -> None:
         if data.get("status") != "downloading":
@@ -63,30 +63,51 @@ async def quality_callback(query: CallbackQuery) -> None:
 
         text = _progress_text(data)
         now = time.monotonic()
-        last_data["data"] = data
-        # Telegram does not need an edit for every yt-dlp progress event.
         if text == last_update["text"] or now - last_update["time"] < 1.5:
             return
         last_update["time"] = now
         last_update["text"] = text
         loop.call_soon_threadsafe(
             asyncio.create_task,
-            status.edit_text(text, reply_markup=cancel_download_keyboard(job.job_id)),
+            status.edit_text(
+                text,
+                reply_markup=cancel_download_keyboard(job.job_id),
+            ),
         )
 
     async def run_download() -> None:
         try:
-            await DownloadEngine(
+            file_path = await DownloadEngine(
                 progress_callback=progress,
                 cancel_event=job.cancel_event,
             ).download(selection.url, selection.format_id)
+
             if job.cancel_event.is_set():
                 raise DownloadCancelled()
-            await status.edit_text("✅ Download complete.")
+
+            file_size = file_path.stat().st_size
+            size_mb = file_size / 1024 / 1024
+            if file_size > settings.max_telegram_file_size:
+                await status.edit_text(
+                    f"📦 Download complete: {size_mb:.1f} MB\n"
+                    "⚠️ The file is above the Telegram upload limit. "
+                    "Automatic splitting will be added in the next media-processing step."
+                )
+                return
+
+            await status.edit_text(
+                f"📤 Uploading to Telegram...\n📦 {size_mb:.1f} MB"
+            )
+            await query.message.answer_document(
+                FSInputFile(file_path),
+                caption=file_path.name,
+            )
+            await status.edit_text("✅ Downloaded and uploaded successfully.")
+
         except DownloadCancelled:
             await status.edit_text("🛑 Download cancelled.")
         except Exception as exc:
-            await status.edit_text(f"❌ Download failed: {type(exc).__name__}: {exc}")
+            await status.edit_text(f"❌ Download/upload failed: {type(exc).__name__}: {exc}")
         finally:
             remove_job(job.job_id)
 
