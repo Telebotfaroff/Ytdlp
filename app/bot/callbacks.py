@@ -10,7 +10,7 @@ from aiogram.types import CallbackQuery, Message
 from app.bot.keyboards.media import media_keyboard\nfrom app.bot.keyboards.upload import upload_keyboard
 from app.media.ffmpeg import create_screenshots, create_trim
 from app.media.resolver import MediaResolver
-from app.upload.gofile import GoFileUploader, UploadError
+from app.upload.gofile import GoFileUploader
 from app.media.session import (
     create_selection,
     create_filename_pending,
