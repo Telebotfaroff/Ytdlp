@@ -26,6 +26,7 @@ class Settings:
     aria2_connections: int = _env_int("ARIA2_CONNECTIONS", 16)
     aria2_split: int = _env_int("ARIA2_SPLIT", 16)
     aria2_max_concurrent: int = _env_int("ARIA2_MAX_CONCURRENT", 2)
+    media_session_ttl_seconds: int = _env_int("MEDIA_SESSION_TTL_SECONDS", 3600)
 
     def prepare_directories(self) -> None:
         self.download_dir.mkdir(parents=True, exist_ok=True)
