@@ -3,6 +3,7 @@
 Python-based modular Telegram media bot.
 
 [![Open in Google Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Telebotfaroff/Ytdlp/blob/main/Ytdlp_Colab.ipynb)
+[![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/code/new?path=https://github.com/Telebotfaroff/Ytdlp/blob/main/Ytdlp_Kaggle.ipynb)
 
 ## Telegram upload architecture
 
@@ -18,13 +19,13 @@ Required Telegram credentials:
 
 Keep `TELEGRAM_API_HASH` secret.
 
-## Run in Google Colab
+## Run in Google Colab or Kaggle
 
-Click the **Open in Google Colab** button above. The notebook installs the project dependencies, FFmpeg, and aria2c, then securely asks for your Telegram credentials before starting the bot.
+Use either launch button above. The notebooks install the project dependencies, FFmpeg, and aria2c, then securely ask for your Telegram credentials before starting the bot.
 
 ## Environment
 
-Copy `.env.example` to `.env` and configure the credentials. In Colab, use environment variables or Colab Secrets instead of committing them.
+Copy `.env.example` to `.env` and configure the credentials. In Colab/Kaggle, use environment variables or their secret-management features instead of committing credentials.
 
 ## Development approach
 
