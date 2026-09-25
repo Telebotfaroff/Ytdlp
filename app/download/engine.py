@@ -1,4 +1,4 @@
-"""yt-dlp download engine with cancellation and external downloader support."""
+"""yt-dlp download engine with cancellation and result tracking."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ ProgressCallback = Callable[[dict[str, Any]], None]
 
 
 class DownloadEngine:
-    """Download selected media while exposing yt-dlp progress events."""
+    """Download selected media while exposing progress events."""
 
     def __init__(
         self,
@@ -26,8 +26,9 @@ class DownloadEngine:
         self.progress_callback = progress_callback
         self.cancel_event = cancel_event
 
-    def _download_sync(self, url: str, format_id: str, output_dir: Path) -> None:
+    def _download_sync(self, url: str, format_id: str, output_dir: Path) -> Path:
         output_dir.mkdir(parents=True, exist_ok=True)
+        before = {p.resolve() for p in output_dir.iterdir() if p.is_file()}
 
         def hook(data: dict[str, Any]) -> None:
             if self.cancel_event and self.cancel_event.is_set():
@@ -56,16 +57,33 @@ class DownloadEngine:
                 ]
             }
 
-        with yt_dlp.YoutubeDL(options) as ydl:
-            ydl.download([url])
+        try:
+            with yt_dlp.YoutubeDL(options) as ydl:
+                ydl.download([url])
+        except DownloadCancelled:
+            raise
+
+        candidates = [
+            p for p in output_dir.iterdir()
+            if p.is_file() and p.resolve() not in before
+        ]
+        if not candidates:
+            # Some post-processing can replace an existing path. Fall back to
+            # the newest regular file in the download directory.
+            candidates = [p for p in output_dir.iterdir() if p.is_file()]
+
+        if not candidates:
+            raise FileNotFoundError("yt-dlp finished without producing a media file")
+
+        return max(candidates, key=lambda p: p.stat().st_mtime)
 
     async def download(
         self,
         url: str,
         format_id: str,
         output_dir: Path | None = None,
-    ) -> None:
-        await asyncio.to_thread(
+    ) -> Path:
+        return await asyncio.to_thread(
             self._download_sync,
             url,
             format_id,
