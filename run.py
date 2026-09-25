@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 
 from app.bot.dispatcher import create_dispatcher
 from app.media.cleanup import cleanup_runtime_storage
+from app.media.session import cleanup_expired
 from app.config.settings import settings
 
 
