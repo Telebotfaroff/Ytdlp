@@ -6,6 +6,7 @@ from aiogram import Bot
 from dotenv import load_dotenv
 
 from app.bot.dispatcher import create_dispatcher
+from app.media.cleanup import cleanup_runtime_storage
 from app.config.settings import settings
 
 
@@ -24,6 +25,16 @@ async def main() -> None:
     finally:
         await bot.session.close()
 
+
+
+async def _cleanup_loop() -> None:
+    while True:
+        cleanup_runtime_storage(
+            settings.download_dir,
+            settings.temp_dir,
+            settings.media_session_ttl_seconds,
+        )
+        await asyncio.sleep(900)
 
 if __name__ == "__main__":
     asyncio.run(main())
