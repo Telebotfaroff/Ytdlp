@@ -6,7 +6,6 @@ from aiogram import Router
 from aiogram.types import Message
 
 from app.bot.keyboards.media import media_keyboard
-
 from app.media.resolver import MediaResolver
 from app.media.session import create_filename_request, create_selection
 
@@ -25,8 +24,22 @@ def _format_duration(seconds: float | None) -> str:
 
 
 def _quality_lines(info) -> list[str]:
-    heights = sorted({f.height for f in info.formats if f.has_video and f.height}, reverse=True)
+    heights = sorted(
+        {int(f.height) for f in info.formats if f.has_video and f.height},
+        reverse=True,
+    )
     return [f"• {height}p" for height in heights[:12]]
+
+
+def _format_selector(height: int) -> str:
+    # Select the requested video height and merge audio when the site exposes
+    # video/audio as separate streams. Fall back to a combined stream.
+    return (
+        f"bestvideo[height={height}]+bestaudio/"
+        f"best[height={height}]/"
+        f"bestvideo[height<={height}]+bestaudio/"
+        f"best[height<={height}]"
+    )
 
 
 @router.message()
@@ -42,19 +55,56 @@ async def url_handler(message: Message) -> None:
     try:
         info = await _resolver.resolve(url)
     except Exception as exc:
-        await status.edit_text(f"❌ Could not resolve this URL.\n\n{type(exc).__name__}: {exc}")
+        await status.edit_text(
+            f"❌ Could not resolve this URL.\n\n{type(exc).__name__}: {exc}"
+        )
         return
 
-    qualities = _quality_lines(info)
-    quality_text = "\n".join(qualities) if qualities else "• Format information unavailable"
-    details = [f"🎬 {info.title}", "", f"⏱ Duration: {_format_duration(info.duration)}"]
+    heights = sorted(
+        {int(f.height) for f in info.formats if f.has_video and f.height},
+        reverse=True,
+    )
+
+    details = [
+        f"🎬 {info.title}",
+        "",
+        f"⏱ Duration: {_format_duration(info.duration)}",
+    ]
     if info.uploader:
         details.append(f"👤 Uploader: {info.uploader}")
-    details += ["", "Available qualities:", quality_text]
-    quality_buttons = []
-    for height in sorted({f.height for f in info.formats if f.has_video and f.height}, reverse=True)[:12]:
-        fmt = next(f for f in info.formats if f.has_video and f.height == height)
-        token = create_selection(url, fmt.format_id)
-        quality_buttons.append((f"{height}p", f"quality:{token}"))
+
+    if heights:
+        details += [
+            "",
+            "Available qualities:",
+            "\n".join(_quality_lines(info)),
+        ]
+    else:
+        details += [
+            "",
+            "⚡ Direct download",
+            "The source did not expose quality metadata.",
+        ]
+
+    quality_buttons: list[tuple[str, str]] = []
+
+    if heights:
+        for height in heights[:12]:
+            token = create_selection(url, _format_selector(height))
+            quality_buttons.append((f"⬇️ {height}p", f"quality:{token}"))
+    else:
+        # Important: a direct media URL may have no extractor format list.
+        # Still give the user a download action instead of forcing the optional
+        # filename flow.
+        token = create_selection(url, "best")
+        quality_buttons.append(("⬇️ Download", f"quality:{token}"))
+
     filename_token = create_filename_request(url)
-    await status.edit_text("\n".join(details), reply_markup=media_keyboard(quality_buttons, f"media:filename:{filename_token}"))
+
+    await status.edit_text(
+        "\n".join(details),
+        reply_markup=media_keyboard(
+            quality_buttons,
+            f"media:filename:{filename_token}",
+        ),
+    )
