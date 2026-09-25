@@ -1,4 +1,4 @@
-"""Callbacks for screenshots, trimming, and custom filenames."""
+""""Callbacks for screenshots, trimming, and custom filenames."""
 
 from __future__ import annotations
 
@@ -35,6 +35,16 @@ def _seconds(value: str) -> float:
     if len(parts) == 3:
         return float(parts[0] * 3600 + parts[1] * 60 + parts[2])
     raise ValueError("Invalid timestamp")
+
+
+def _format_selector(height: int) -> str:
+    """Select a video height and merge separate audio when available."""
+    return (
+        f"bestvideo[height={height}]+bestaudio/"
+        f"best[height={height}]/"
+        f"bestvideo[height<={height}]+bestaudio/"
+        f"best[height<={height}]"
+    )
 
 
 @router.callback_query(lambda q: q.data and q.data.startswith("media:filename:"))
@@ -120,7 +130,7 @@ async def text_action_handler(message: Message) -> None:
             logger.info("Resolving again for custom filename | user=%s | url=%s", user_id, pending.url)
             info = await MediaResolver().resolve(pending.url)
 
-            qualities = []
+            qualities: list[tuple[str, str]] = []
             seen_heights: set[int] = set()
             for fmt in sorted(
                 [f for f in info.formats if f.has_video and f.height],
@@ -131,13 +141,15 @@ async def text_action_handler(message: Message) -> None:
                 if height in seen_heights:
                     continue
                 seen_heights.add(height)
-                token = create_selection(pending.url, fmt.format_id, filename)
-                qualities.append((f"{height}p", f"quality:{token}"))
+                token = create_selection(pending.url, _format_selector(height), filename)
+                qualities.append((f"⬇️ {height}p", f"quality:{token}"))
 
             if not qualities:
-                logger.error("No video qualities found for custom filename | url=%s", pending.url)
-                await message.answer("❌ No downloadable video qualities were found for this URL.")
-                return
+                # Direct media URLs can legitimately have no extractor format list.
+                # Keep the custom filename flow usable instead of forcing a quality
+                # that yt-dlp cannot discover.
+                token = create_selection(pending.url, "best", filename)
+                qualities.append(("⬇️ Download", f"quality:{token}"))
 
             logger.info(
                 "Custom filename ready | user=%s | filename=%s | qualities=%d",
@@ -202,18 +214,18 @@ async def gofile_callback(query: CallbackQuery) -> None:
         last["time"] = now
         percent = sent / total * 100 if total else 0
         text = (
-            f"☁️ GoFile upload... {percent:.1f}%\n"
-            f"📦 {sent / 1024 / 1024:.1f} / {total / 1024 / 1024:.1f} MB\n"
+            f"☁️ GoFile upload... {percent:.1f}%\\n"
+            f"📦 {sent / 1024 / 1024:.1f} / {total / 1024 / 1024:.1f} MB\\n"
             f"⚡ {speed / 1024 / 1024:.2f} MB/s"
         )
         if eta is not None:
-            text += f"\n⏱ ETA: {eta}s"
+            text += f"\\n⏱ ETA: {eta}s"
         import asyncio
         asyncio.create_task(status.edit_text(text))
 
     try:
         link = await GoFileUploader().upload(selection.file_path, progress=progress)
-        await status.edit_text(f"✅ GoFile upload complete.\n\n{link}")
+        await status.edit_text(f"✅ GoFile upload complete.\\n\\n{link}")
     except Exception as exc:
         logger.exception("GoFile upload failed")
         await status.edit_text(f"❌ GoFile upload failed: {type(exc).__name__}: {exc}")
