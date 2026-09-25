@@ -29,7 +29,7 @@ _FILENAME_PENDING: dict[int, FilenamePending] = {}
 
 def create_selection(url: str, format_id: str, filename: str | None = None) -> str:
     token = uuid4().hex[:12]
-    _SELECTIONS[token] = MediaSelection(url, format_id, filename)
+    _SELECTIONS[token] = MediaSelection(url, format_id, filename, monotonic())
     return token
 
 def pop_selection(token: str) -> MediaSelection | None:
@@ -54,7 +54,7 @@ def get_user_processing(user_id: int) -> tuple[str, ProcessingSelection | None]:
 
 def create_filename_request(url: str) -> str:
     token = uuid4().hex[:12]
-    _SELECTIONS[token] = MediaSelection(url, "__filename__")
+    _SELECTIONS[token] = MediaSelection(url, "__filename__", None, monotonic())
     return token
 
 def create_filename_pending(url: str, user_id: int) -> FilenamePending:
