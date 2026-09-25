@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+import logging
 
 from aiogram import Router
 from aiogram.types import CallbackQuery
@@ -18,6 +19,7 @@ from app.media.session import create_processing, pop_selection
 from app.upload.telegram import get_telegram_uploader
 
 router = Router(name="download")
+logger = logging.getLogger("ytdlp.telegram")
 
 
 def _progress_text(data: dict) -> str:
@@ -62,6 +64,7 @@ async def quality_callback(query: CallbackQuery) -> None:
         await query.answer("You already have a download running.", show_alert=True)
         return
 
+    logger.info("Download started | user=%s | url=%s | format=%s | filename=%s", user_id, selection.url, selection.format_id, selection.filename)
     await query.answer("Starting download...")
     status = await query.message.answer(
         "⬇️ Preparing download...",
@@ -93,6 +96,7 @@ async def quality_callback(query: CallbackQuery) -> None:
 
     async def run_download() -> None:
         try:
+            logger.info("Download worker running | user=%s | job=%s", user_id, job.job_id)
             file_path = await DownloadEngine(
                 progress_callback=progress,
                 cancel_event=job.cancel_event,
@@ -138,6 +142,7 @@ async def quality_callback(query: CallbackQuery) -> None:
                     progress=upload_progress,
                 )
 
+            logger.info("Upload complete | user=%s | job=%s | file=%s", user_id, job.job_id, file_path)
             token = create_processing(file_path, user_id)
             await status.edit_text(
                 "✅ Upload complete.\n\nChoose an action:",
@@ -145,8 +150,10 @@ async def quality_callback(query: CallbackQuery) -> None:
             )
 
         except DownloadCancelled:
+            logger.info("Download cancelled | user=%s | job=%s", user_id, job.job_id)
             await status.edit_text("🛑 Download cancelled.")
         except Exception as exc:
+            logger.exception("Download failed | user=%s | job=%s", user_id, job.job_id)
             await status.edit_text(
                 f"❌ Download/processing/upload failed: {type(exc).__name__}: {exc}"
             )
