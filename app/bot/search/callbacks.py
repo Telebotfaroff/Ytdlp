@@ -45,7 +45,7 @@ async def _render(query: CallbackQuery, token: str) -> None:
     try:
         if result.thumbnail:
             await query.message.edit_media(
-                InputMediaPhoto(media=result.thumbnail, caption=caption),
+                media=InputMediaPhoto(media=result.thumbnail, caption=caption),
                 reply_markup=markup,
             )
         else:
