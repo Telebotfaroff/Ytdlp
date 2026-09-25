@@ -15,7 +15,6 @@ def media_keyboard(qualities: list[tuple[str, str]], filename_callback: str) -> 
         rows.append(quality_row)
 
     rows.extend([
-        [InlineKeyboardButton(text="✏️ Custom Filename", callback_data=filename_callback)],
         [
             InlineKeyboardButton(text="📸 Screenshots", callback_data="media:screenshots"),
             InlineKeyboardButton(text="✂️ Trim", callback_data="media:trim"),
