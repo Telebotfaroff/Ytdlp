@@ -1,14 +1,16 @@
-"""yt-dlp download engine with configurable external downloader support."""
+"""yt-dlp download engine with cancellation and external downloader support."""
 
 from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from threading import Event
 from typing import Callable, Any
 
 import yt_dlp
 
 from app.config.settings import settings
+from app.download.jobs import DownloadCancelled
 
 ProgressCallback = Callable[[dict[str, Any]], None]
 
@@ -16,15 +18,24 @@ ProgressCallback = Callable[[dict[str, Any]], None]
 class DownloadEngine:
     """Download selected media while exposing yt-dlp progress events."""
 
-    def __init__(self, progress_callback: ProgressCallback | None = None) -> None:
+    def __init__(
+        self,
+        progress_callback: ProgressCallback | None = None,
+        cancel_event: Event | None = None,
+    ) -> None:
         self.progress_callback = progress_callback
+        self.cancel_event = cancel_event
 
     def _download_sync(self, url: str, format_id: str, output_dir: Path) -> None:
         output_dir.mkdir(parents=True, exist_ok=True)
 
         def hook(data: dict[str, Any]) -> None:
+            if self.cancel_event and self.cancel_event.is_set():
+                raise DownloadCancelled()
             if self.progress_callback:
                 self.progress_callback(data)
+            if self.cancel_event and self.cancel_event.is_set():
+                raise DownloadCancelled()
 
         options: dict[str, Any] = {
             "quiet": True,
@@ -35,8 +46,6 @@ class DownloadEngine:
             "progress_hooks": [hook],
         }
 
-        # yt-dlp can use aria2c when it is installed and explicitly enabled.
-        # We keep this opt-in so unsupported environments still work with native HTTP.
         if settings.aria2_connections > 1:
             options["external_downloader"] = "aria2c"
             options["external_downloader_args"] = {
@@ -50,5 +59,15 @@ class DownloadEngine:
         with yt_dlp.YoutubeDL(options) as ydl:
             ydl.download([url])
 
-    async def download(self, url: str, format_id: str, output_dir: Path | None = None) -> None:
-        await asyncio.to_thread(self._download_sync, url, format_id, output_dir or settings.download_dir)
+    async def download(
+        self,
+        url: str,
+        format_id: str,
+        output_dir: Path | None = None,
+    ) -> None:
+        await asyncio.to_thread(
+            self._download_sync,
+            url,
+            format_id,
+            output_dir or settings.download_dir,
+        )
