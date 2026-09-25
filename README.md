@@ -3,7 +3,7 @@
 Python-based modular Telegram media bot.
 
 [![Open in Google Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Telebotfaroff/Ytdlp/blob/main/Ytdlp_Colab.ipynb)
-[![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/code/new?path=https://github.com/Telebotfaroff/Ytdlp/blob/main/Ytdlp_Kaggle.ipynb)
+[![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/Telebotfaroff/Ytdlp/blob/main/Ytdlp_Kaggle.ipynb)
 
 ## Telegram upload architecture
 
