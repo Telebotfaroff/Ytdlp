@@ -20,10 +20,13 @@ async def main() -> None:
 
     bot = Bot(token=settings.bot_token)
     dispatcher = create_dispatcher()
+    cleanup_task = asyncio.create_task(_cleanup_loop())
     try:
         await bot.delete_webhook(drop_pending_updates=True)
         await dispatcher.start_polling(bot)
     finally:
+        cleanup_task.cancel()
+        await asyncio.gather(cleanup_task, return_exceptions=True)
         await bot.session.close()
 
 
