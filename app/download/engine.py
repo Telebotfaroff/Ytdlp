@@ -1,4 +1,4 @@
-""""yt-dlp download engine with cancellation and result tracking."""
+"""yt-dlp download engine with cancellation and result tracking."""
 
 from __future__ import annotations
 
