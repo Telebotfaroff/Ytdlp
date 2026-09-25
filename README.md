@@ -2,6 +2,8 @@
 
 Python-based modular Telegram media bot.
 
+[![Open in Google Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Telebotfaroff/Ytdlp/blob/main/Ytdlp_Colab.ipynb)
+
 ## Telegram upload architecture
 
 The bot uses **aiogram** for Bot API updates and UI, and **Pyrogram + MTProto** for Telegram file uploads.
@@ -15,6 +17,10 @@ Required Telegram credentials:
 - `TELEGRAM_API_HASH`
 
 Keep `TELEGRAM_API_HASH` secret.
+
+## Run in Google Colab
+
+Click the **Open in Google Colab** button above. The notebook installs the project dependencies, FFmpeg, and aria2c, then securely asks for your Telegram credentials before starting the bot.
 
 ## Environment
 
