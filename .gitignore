@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.pytest_cache/
+.mypy_cache/
+ruff_cache/
+
+# Runtime files
+downloads/*
+!downloads/.gitkeep
+tmp/*
+!tmp/.gitkeep
