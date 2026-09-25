@@ -1,9 +1,10 @@
-"""yt-dlp download engine with cancellation and result tracking."""
+""""yt-dlp download engine with cancellation and result tracking."""
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import shutil
 from pathlib import Path
 from threading import Event
 from typing import Callable, Any
@@ -88,8 +89,9 @@ class DownloadEngine:
             "logger": _YtDlpLogger(),
         }
 
-        if settings.aria2_connections > 1:
-            options["external_downloader"] = "aria2c"
+        aria2c = shutil.which("aria2c")
+        if aria2c and settings.aria2_connections > 1:
+            options["external_downloader"] = aria2c
             options["external_downloader_args"] = {
                 "aria2c": [
                     "-x", str(settings.aria2_connections),
@@ -98,11 +100,14 @@ class DownloadEngine:
                 ]
             }
             logger.info(
-                "aria2c enabled | connections=%s split=%s concurrent=%s",
+                "aria2c enabled | executable=%s | connections=%s split=%s concurrent=%s",
+                aria2c,
                 settings.aria2_connections,
                 settings.aria2_split,
                 settings.aria2_max_concurrent,
             )
+        elif settings.aria2_connections > 1:
+            logger.info("aria2c unavailable; using yt-dlp native downloader")
 
         try:
             with yt_dlp.YoutubeDL(options) as ydl:
