@@ -82,7 +82,6 @@ jobs:
           print("Pyrogram client constructed:", type(pyrogram_client).__name__)
           print("aiogram bot constructed:", type(bot).__name__)
 
-          pyrogram_client.stop()
           print("Telegram client construction test passed.")
           PY
 
