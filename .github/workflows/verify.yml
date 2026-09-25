@@ -1,0 +1,123 @@
+name: Code Verification
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Compile Python files
+        run: |
+          python -m compileall -q app scripts run.py
+
+      - name: Import application modules
+        run: |
+          python - <<'PY'
+          import importlib
+          import pkgutil
+
+          packages = ["app"]
+          failures = []
+
+          for package_name in packages:
+              package = importlib.import_module(package_name)
+              for module in pkgutil.walk_packages(package.__path__, package.__name__ + "."):
+                  try:
+                      importlib.import_module(module.name)
+                  except Exception as exc:
+                      failures.append(f"{module.name}: {type(exc).__name__}: {exc}")
+
+          importlib.import_module("run")
+
+          if failures:
+              print("Module import failures:")
+              for failure in failures:
+                  print(f"  - {failure}")
+              raise SystemExit(1)
+
+          print("All application modules imported successfully.")
+          PY
+
+      - name: Validate Pyrogram and aiogram initialization
+        run: |
+          python - <<'PY'
+          from aiogram import Bot
+          from pyrogram import Client
+
+          api_id = 123456
+          api_hash = "test_api_hash"
+          bot_token = "123456:TEST_TOKEN"
+
+          pyrogram_client = Client(
+              "ci_test",
+              api_id=api_id,
+              api_hash=api_hash,
+              bot_token=bot_token,
+              in_memory=True,
+          )
+
+          bot = Bot(token=bot_token)
+
+          print("Pyrogram client constructed:", type(pyrogram_client).__name__)
+          print("aiogram bot constructed:", type(bot).__name__)
+
+          pyrogram_client.stop()
+          print("Telegram client construction test passed.")
+          PY
+
+      - name: Check required system tools
+        run: |
+          echo "FFmpeg:"
+          if command -v ffmpeg >/dev/null 2>&1; then
+            ffmpeg -version | head -n 1
+          else
+            echo "WARNING: ffmpeg is not installed. Media processing tests require it."
+          fi
+
+          echo "aria2c:"
+          if command -v aria2c >/dev/null 2>&1; then
+            aria2c --version | head -n 1
+          else
+            echo "WARNING: aria2c is not installed. yt-dlp will need fallback handling."
+          fi
+
+      - name: Validate configuration defaults
+        run: |
+          python - <<'PY'
+          import os
+          os.environ["BOT_TOKEN"] = "123456:TEST_TOKEN"
+          os.environ["TELEGRAM_API_ID"] = "123456"
+          os.environ["TELEGRAM_API_HASH"] = "test_api_hash"
+
+          from app.config.settings import Settings
+
+          settings = Settings()
+
+          assert settings.bot_token == "123456:TEST_TOKEN"
+          assert settings.telegram_api_id == 123456
+          assert settings.telegram_api_hash == "test_api_hash"
+          assert settings.max_telegram_file_size == 2 * 1024**3
+
+          print("Configuration validation passed.")
+          PY
