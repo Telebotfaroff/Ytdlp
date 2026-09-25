@@ -19,7 +19,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
           cache: pip
 
       - name: Install Python dependencies
@@ -36,70 +36,46 @@ jobs:
           python - <<'PY'
           import importlib
           import pkgutil
-
-          packages = ["app"]
           failures = []
-
-          for package_name in packages:
-              package = importlib.import_module(package_name)
-              for module in pkgutil.walk_packages(package.__path__, package.__name__ + "."):
-                  try:
-                      importlib.import_module(module.name)
-                  except Exception as exc:
-                      failures.append(f"{module.name}: {type(exc).__name__}: {exc}")
-
+          package = importlib.import_module("app")
+          for module in pkgutil.walk_packages(package.__path__, package.__name__ + "."):
+              try:
+                  importlib.import_module(module.name)
+              except Exception as exc:
+                  failures.append(f"{module.name}: {type(exc).__name__}: {exc}")
           importlib.import_module("run")
-
           if failures:
               print("Module import failures:")
               for failure in failures:
                   print(f"  - {failure}")
               raise SystemExit(1)
-
           print("All application modules imported successfully.")
           PY
 
-      - name: Validate Pyrogram and aiogram initialization
+      - name: Validate Telegram client construction
         run: |
           python - <<'PY'
           from aiogram import Bot
           from pyrogram import Client
-
-          api_id = 123456
-          api_hash = "test_api_hash"
           bot_token = "123456:TEST_TOKEN"
-
-          pyrogram_client = Client(
-              "ci_test",
-              api_id=api_id,
-              api_hash=api_hash,
-              bot_token=bot_token,
-              in_memory=True,
-          )
-
+          client = Client("ci_test", api_id=123456, api_hash="test_api_hash", bot_token=bot_token, in_memory=True)
           bot = Bot(token=bot_token)
-
-          print("Pyrogram client constructed:", type(pyrogram_client).__name__)
-          print("aiogram bot constructed:", type(bot).__name__)
-
+          print("Pyrogram client:", type(client).__name__)
+          print("aiogram bot:", type(bot).__name__)
           print("Telegram client construction test passed.")
+          PY
+
+      - name: Validate Eporner API
+        run: |
+          python - <<'PY'
+          import eporner_api
+          print("Eporner API imported:", eporner_api.__name__)
           PY
 
       - name: Check required system tools
         run: |
-          echo "FFmpeg:"
-          if command -v ffmpeg >/dev/null 2>&1; then
-            ffmpeg -version | head -n 1
-          else
-            echo "WARNING: ffmpeg is not installed. Media processing tests require it."
-          fi
-
-          echo "aria2c:"
-          if command -v aria2c >/dev/null 2>&1; then
-            aria2c --version | head -n 1
-          else
-            echo "WARNING: aria2c is not installed. yt-dlp will need fallback handling."
-          fi
+          command -v ffmpeg >/dev/null 2>&1 || echo "WARNING: ffmpeg is not installed."
+          command -v aria2c >/dev/null 2>&1 || echo "WARNING: aria2c is not installed."
 
       - name: Validate configuration defaults
         run: |
@@ -108,15 +84,11 @@ jobs:
           os.environ["BOT_TOKEN"] = "123456:TEST_TOKEN"
           os.environ["TELEGRAM_API_ID"] = "123456"
           os.environ["TELEGRAM_API_HASH"] = "test_api_hash"
-
           from app.config.settings import Settings
-
           settings = Settings()
-
           assert settings.bot_token == "123456:TEST_TOKEN"
           assert settings.telegram_api_id == 123456
           assert settings.telegram_api_hash == "test_api_hash"
           assert settings.max_telegram_file_size == 2 * 1024**3
-
           print("Configuration validation passed.")
           PY
