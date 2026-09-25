@@ -42,3 +42,9 @@ def get_user_processing(user_id: int) -> tuple[str, ProcessingSelection | None]:
         if selection.user_id == user_id:
             return token, selection
     return "", None
+
+
+def create_filename_request(url: str) -> str:
+    token = uuid4().hex[:12]
+    _SELECTIONS[token] = MediaSelection(url, "__filename__")
+    return token
