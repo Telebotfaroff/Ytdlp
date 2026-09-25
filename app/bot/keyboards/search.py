@@ -1,45 +1,20 @@
-"""Inline keyboards for paginated source search results."""
+"""Inline keyboards for paginated search results."""
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 
-def result_keyboard(
-    session_token: str,
-    index: int,
-    total: int,
-) -> InlineKeyboardMarkup:
+def result_keyboard(token: str, index: int, total: int) -> InlineKeyboardMarkup:
     nav = []
     if index > 0:
-        nav.append(
-            InlineKeyboardButton(
-                text="⬅️ Previous",
-                callback_data=f"srcprev:{session_token}",
-            )
-        )
+        nav.append(InlineKeyboardButton(text="⬅️ Previous", callback_data=f"srcprev:{token}"))
     if index < total - 1:
-        nav.append(
-            InlineKeyboardButton(
-                text="Next ➡️",
-                callback_data=f"srcnext:{session_token}",
-            )
-        )
-
+        nav.append(InlineKeyboardButton(text="Next ➡️", callback_data=f"srcnext:{token}"))
     rows = [nav] if nav else []
-    rows.append(
-        [
-            InlineKeyboardButton(
-                text="⬇️ Download",
-                callback_data=f"srcquality:{session_token}",
-            )
-        ]
-    )
+    rows.append([InlineKeyboardButton(text="⬇️ Download", callback_data=f"srcquality:{token}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def quality_keyboard(
-    qualities: list[tuple[str, str]],
-    filename_callback: str,
-) -> InlineKeyboardMarkup:
+def quality_keyboard(qualities: list[tuple[str, str]], filename_callback: str) -> InlineKeyboardMarkup:
     rows = []
     row = []
     for label, callback_data in qualities:
@@ -49,13 +24,5 @@ def quality_keyboard(
             row = []
     if row:
         rows.append(row)
-
-    rows.append(
-        [
-            InlineKeyboardButton(
-                text="✏️ Custom Filename (Optional)",
-                callback_data=filename_callback,
-            )
-        ]
-    )
+    rows.append([InlineKeyboardButton(text="✏️ Custom Filename (Optional)", callback_data=filename_callback)])
     return InlineKeyboardMarkup(inline_keyboard=rows)
