@@ -29,6 +29,7 @@ class Settings:
     download_dir: Path = Path(os.getenv("DOWNLOAD_DIR", "./downloads"))
     temp_dir: Path = Path(os.getenv("TEMP_DIR", "./tmp"))
     max_telegram_file_size: int = _env_int("MAX_TELEGRAM_FILE_SIZE", 2 * 1024**3)
+    aria2_enabled: bool = os.getenv("ARIA2_ENABLED", "0").strip().lower() in {"1", "true", "yes", "on"}
     aria2_connections: int = _env_int("ARIA2_CONNECTIONS", 16)
     aria2_split: int = _env_int("ARIA2_SPLIT", 16)
     aria2_max_concurrent: int = _env_int("ARIA2_MAX_CONCURRENT", 2)
