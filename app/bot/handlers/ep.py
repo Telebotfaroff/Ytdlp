@@ -11,7 +11,8 @@ from uuid import uuid4
 from aiogram import Router
 from aiogram.filters import Command, CommandObject
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
-from eporner_api import Client, DownloadConfigRAW
+from eporner_api import Client, DownloadConfigRAW, make_iterator_config
+import yt_dlp
 
 from app.config.settings import settings
 from app.upload.telegram import get_telegram_uploader
@@ -50,6 +51,7 @@ async def eporner_search(message: Message, command: CommandObject) -> None:
 
     try:
         client = Client()
+        iterator_config = make_iterator_config(load_specific_sources=("api",))
         stream = client.search_videos(
             query=query,
             sorting_gay="0",
@@ -57,6 +59,7 @@ async def eporner_search(message: Message, command: CommandObject) -> None:
             sorting_low_quality="1",
             per_page=5,
             pages=1,
+            iterator_config=iterator_config,
         )
 
         count = 0
@@ -116,24 +119,48 @@ async def eporner_download(query: CallbackQuery) -> None:
         settings.prepare_directories()
         before = {p.resolve() for p in settings.download_dir.iterdir() if p.is_file()}
 
-        client = Client()
-        video = await client.get_video(url, load_html=True, load_api=True)
-        config = DownloadConfigRAW(
-            quality="best",
-            path=str(settings.download_dir),
-            no_title=False,
-        )
-        await video.download(config, mode="mp4_h264")
+        file_path = None
 
-        candidates = [
-            p for p in settings.download_dir.iterdir()
-            if p.is_file() and p.resolve() not in before
-        ]
-        if not candidates:
-            raise FileNotFoundError("Eporner API finished without producing a file")
+        try:
+            client = Client()
+            video = await client.get_video(url, load_html=True, load_api=True)
+            config = DownloadConfigRAW(
+                quality="best",
+                path=str(settings.download_dir),
+                no_title=False,
+            )
+            await video.download(config, mode="mp4_h264")
+            candidates = [
+                p for p in settings.download_dir.iterdir()
+                if p.is_file() and p.resolve() not in before
+            ]
+            if candidates:
+                file_path = max(candidates, key=lambda p: p.stat().st_mtime)
+        except Exception as api_exc:
+            logger.warning("Eporner API download failed; trying yt-dlp fallback: %s", api_exc)
 
-        file_path = max(candidates, key=lambda p: p.stat().st_mtime)
+        if file_path is None:
+            def _yt_dlp_download() -> Path:
+                output_template = str(settings.download_dir / "%(title)s.%(ext)s")
+                options = {
+                    "quiet": True,
+                    "no_warnings": False,
+                    "noplaylist": True,
+                    "format": "bestvideo*+bestaudio/best",
+                    "merge_output_format": "mp4",
+                    "outtmpl": output_template,
+                }
+                with yt_dlp.YoutubeDL(options) as ydl:
+                    ydl.download([url])
+                candidates = [
+                    p for p in settings.download_dir.iterdir()
+                    if p.is_file() and p.resolve() not in before
+                ]
+                if not candidates:
+                    raise FileNotFoundError("Neither Eporner API nor yt-dlp produced a file")
+                return max(candidates, key=lambda p: p.stat().st_mtime)
 
+            file_path = await asyncio.to_thread(_yt_dlp_download)
         if file_path.stat().st_size > settings.max_telegram_file_size:
             raise ValueError("Downloaded file is larger than the configured 2 GB Telegram limit.")
 
