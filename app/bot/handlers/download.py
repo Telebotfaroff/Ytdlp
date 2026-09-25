@@ -82,7 +82,7 @@ async def quality_callback(query: CallbackQuery) -> None:
             file_path = await DownloadEngine(
                 progress_callback=progress,
                 cancel_event=job.cancel_event,
-            ).download(selection.url, selection.format_id)
+            ).download(selection.url, selection.format_id, filename=selection.filename)
 
             if job.cancel_event.is_set():
                 raise DownloadCancelled()
