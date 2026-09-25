@@ -21,9 +21,18 @@ def _env_int(name: str, default: int) -> int:
         raise ValueError(f"{name} must be an integer") from exc
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None or value == "":
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 @dataclass(frozen=True)
 class Settings:
     bot_token: str = os.getenv("BOT_TOKEN", "")
+    telegram_api_base: str = os.getenv("TELEGRAM_API_BASE", "http://localhost:8081")
+    telegram_api_is_local: bool = _env_bool("TELEGRAM_API_IS_LOCAL", True)
     download_dir: Path = Path(os.getenv("DOWNLOAD_DIR", "./downloads"))
     temp_dir: Path = Path(os.getenv("TEMP_DIR", "./tmp"))
     max_telegram_file_size: int = _env_int("MAX_TELEGRAM_FILE_SIZE", 2 * 1024**3)
