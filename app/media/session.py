@@ -70,7 +70,7 @@ def pop_filename_pending(user_id: int) -> FilenamePending | None:
 
 def cleanup_expired(max_age_seconds: int) -> None:
     now = monotonic()
-    _SELECTIONS.clear()
+    for token, selection in list(_SELECTIONS.items()):\n        if now - selection.created_at > max_age_seconds:\n            _SELECTIONS.pop(token, None)
     for token, selection in list(_PROCESSING.items()):
         if now - selection.created_at > max_age_seconds:
             _PROCESSING.pop(token, None)
