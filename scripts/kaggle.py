@@ -1,11 +1,12 @@
-"""Kaggle launcher placeholder.
+"""Kaggle launcher for the Telegram bot."""
 
-Step 1 only prepares the project. Bot startup will be added in a later step.
-"""
+import asyncio
 
-from app.config.settings import settings
+from dotenv import load_dotenv
+
+from run import main
 
 
 if __name__ == "__main__":
-    settings.prepare_directories()
-    print("Project environment initialized for Kaggle.")
+    load_dotenv()
+    asyncio.run(main())
