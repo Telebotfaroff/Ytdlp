@@ -42,11 +42,11 @@ async def url_handler(message: Message) -> None:
     try:
         info = await _resolver.resolve(url)
     except Exception as exc:
-        await status.edit_text(f"❌ Could not resolve this URL.\\n\\n{type(exc).__name__}: {exc}")
+        await status.edit_text(f"❌ Could not resolve this URL.\n\n{type(exc).__name__}: {exc}")
         return
 
     qualities = _quality_lines(info)
-    quality_text = "\\n".join(qualities) if qualities else "• Format information unavailable"
+    quality_text = "\n".join(qualities) if qualities else "• Format information unavailable"
     details = [f"🎬 {info.title}", "", f"⏱ Duration: {_format_duration(info.duration)}"]
     if info.uploader:
         details.append(f"👤 Uploader: {info.uploader}")
@@ -57,4 +57,4 @@ async def url_handler(message: Message) -> None:
         token = create_selection(url, fmt.format_id)
         quality_buttons.append((f"{height}p", f"quality:{token}"))
     filename_token = create_filename_request(url)
-    await status.edit_text("\\n".join(details), reply_markup=media_keyboard(quality_buttons, f"media:filename:{filename_token}"))
+    await status.edit_text("\n".join(details), reply_markup=media_keyboard(quality_buttons, f"media:filename:{filename_token}"))
