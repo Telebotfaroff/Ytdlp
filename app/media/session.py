@@ -48,3 +48,22 @@ def create_filename_request(url: str) -> str:
     token = uuid4().hex[:12]
     _SELECTIONS[token] = MediaSelection(url, "__filename__")
     return token
+
+
+@dataclass(frozen=True)
+class FilenamePending:
+    url: str
+    user_id: int
+
+_FILENAME_PENDING: dict[int, FilenamePending] = {}
+
+def create_filename_pending(url: str, user_id: int) -> FilenamePending:
+    pending = FilenamePending(url, user_id)
+    _FILENAME_PENDING[user_id] = pending
+    return pending
+
+def get_filename_pending(user_id: int) -> FilenamePending | None:
+    return _FILENAME_PENDING.get(user_id)
+
+def pop_filename_pending(user_id: int) -> FilenamePending | None:
+    return _FILENAME_PENDING.pop(user_id, None)
