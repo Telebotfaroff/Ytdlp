@@ -6,16 +6,16 @@ import asyncio
 import time
 
 from aiogram import Router
-from aiogram.types import CallbackQuery, FSInputFile
+from aiogram.types import CallbackQuery
 
 from app.bot.keyboards.download import cancel_download_keyboard
-from app.bot.keyboards.processing import processing_keyboard
 from app.bot.keyboards.upload import upload_keyboard
 from app.config.settings import settings
 from app.download.engine import DownloadEngine
 from app.download.jobs import DownloadCancelled, create_job, get_job, remove_job
 from app.media.ffmpeg import split_media
 from app.media.session import create_processing, pop_selection
+from app.upload.telegram import get_telegram_uploader
 
 router = Router(name="download")
 
@@ -31,6 +31,19 @@ def _progress_text(data: dict) -> str:
     if total:
         text += f" / {total / 1024 / 1024:.1f} MB"
     text += f"\n⚡ {speed / 1024 / 1024:.2f} MB/s"
+    if eta is not None:
+        text += f"\n⏱ ETA: {eta}s"
+    return text
+
+
+def _upload_progress_text(sent: int, total: int, speed: float, eta: int | None) -> str:
+    percent = sent / total * 100 if total else 0
+    text = (
+        f"📤 Uploading to Telegram...\n\n"
+        f"{percent:.1f}%\n"
+        f"📦 {sent / 1024 / 1024:.1f} / {total / 1024 / 1024:.1f} MB\n"
+        f"⚡ {speed / 1024 / 1024:.2f} MB/s"
+    )
     if eta is not None:
         text += f"\n⏱ ETA: {eta}s"
     return text
@@ -90,7 +103,7 @@ async def quality_callback(query: CallbackQuery) -> None:
 
             file_size = file_path.stat().st_size
             if file_size > settings.max_telegram_file_size:
-                await status.edit_text("🧩 Large file detected. Splitting for Telegram...")
+                await status.edit_text("🧩 File is larger than Telegram's 2 GB bot limit. Splitting...")
                 parts = await split_media(
                     file_path,
                     settings.temp_dir / f"parts_{job.job_id}",
@@ -99,27 +112,44 @@ async def quality_callback(query: CallbackQuery) -> None:
             else:
                 parts = [file_path]
 
-            await status.edit_text(
-                f"📤 Uploading {len(parts)} file{'s' if len(parts) != 1 else ''} to Telegram..."
-            )
+            uploader = get_telegram_uploader()
+            last_upload_update = {"time": 0.0}
 
             for index, part in enumerate(parts, 1):
                 if job.cancel_event.is_set():
                     raise DownloadCancelled()
+
                 caption = part.name if len(parts) == 1 else f"{part.name} ({index}/{len(parts)})"
-                await query.message.answer_document(
-                    FSInputFile(part),
+
+                def upload_progress(sent: int, total: int, speed: float, eta: int | None) -> None:
+                    now = time.monotonic()
+                    if now - last_upload_update["time"] < 1.5 and sent < total:
+                        return
+                    last_upload_update["time"] = now
+                    loop.call_soon_threadsafe(
+                        asyncio.create_task,
+                        status.edit_text(_upload_progress_text(sent, total, speed, eta)),
+                    )
+
+                await uploader.upload_document(
+                    chat_id=user_id,
+                    path=part,
                     caption=caption,
+                    progress=upload_progress,
                 )
 
             token = create_processing(file_path, user_id)
-            await status.edit_text("✅ Upload complete.\n\nChoose a media-processing action:", reply_markup=processing_keyboard(token))
-            await status.edit_text("✅ Upload complete.\n\nChoose an action:", reply_markup=upload_keyboard(token))
+            await status.edit_text(
+                "✅ Upload complete.\n\nChoose an action:",
+                reply_markup=upload_keyboard(token),
+            )
 
         except DownloadCancelled:
             await status.edit_text("🛑 Download cancelled.")
         except Exception as exc:
-            await status.edit_text(f"❌ Download/processing/upload failed: {type(exc).__name__}: {exc}")
+            await status.edit_text(
+                f"❌ Download/processing/upload failed: {type(exc).__name__}: {exc}"
+            )
         finally:
             remove_job(job.job_id)
 
