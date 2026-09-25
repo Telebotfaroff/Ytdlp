@@ -38,7 +38,9 @@ class DownloadEngine:
             if self.cancel_event and self.cancel_event.is_set():
                 raise DownloadCancelled()
 
-        output_template = str(output_dir / ((filename + ".%(ext)s") if filename else "%(title)s.%(ext)s"))\n\n        options: dict[str, Any] = {
+        output_template = str(output_dir / ((filename + ".%(ext)s") if filename else "%(title)s.%(ext)s"))
+
+        options: dict[str, Any] = {
             "quiet": True,
             "no_warnings": True,
             "noplaylist": True,
@@ -88,4 +90,5 @@ class DownloadEngine:
             url,
             format_id,
             output_dir or settings.download_dir,
+            filename,
         )
