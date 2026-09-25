@@ -8,7 +8,7 @@ from aiogram import Router
 from aiogram.filters import Command, CommandObject
 from aiogram.types import Message
 
-from eporner_api import Client, make_iterator_config
+from eporner_api import Client
 
 from app.bot.keyboards.search import result_keyboard
 from app.bot.search.session import SearchResult, cleanup, create_session
@@ -36,7 +36,6 @@ async def search_handler(message: Message, command: CommandObject) -> None:
             sorting_low_quality="1",
             per_page=_LIMIT,
             pages=1,
-            iterator_config=make_iterator_config(load_specific_sources=("api",)),
         )
 
         results = []
