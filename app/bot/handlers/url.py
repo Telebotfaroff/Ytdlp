@@ -56,4 +56,5 @@ async def url_handler(message: Message) -> None:
         fmt = next(f for f in info.formats if f.has_video and f.height == height)
         token = create_selection(url, fmt.format_id)
         quality_buttons.append((f"{height}p", f"quality:{token}"))
-    filename_token = create_filename_request(url)\n    await status.edit_text("\\n".join(details), reply_markup=media_keyboard(quality_buttons, f"media:filename:{filename_token}"))
+    filename_token = create_filename_request(url)
+    await status.edit_text("\\n".join(details), reply_markup=media_keyboard(quality_buttons, f"media:filename:{filename_token}"))
