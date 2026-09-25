@@ -26,7 +26,7 @@ class DownloadEngine:
         self.progress_callback = progress_callback
         self.cancel_event = cancel_event
 
-    def _download_sync(self, url: str, format_id: str, output_dir: Path) -> Path:
+    def _download_sync(self, url: str, format_id: str, output_dir: Path, filename: str | None = None) -> Path:
         output_dir.mkdir(parents=True, exist_ok=True)
         before = {p.resolve() for p in output_dir.iterdir() if p.is_file()}
 
@@ -38,12 +38,12 @@ class DownloadEngine:
             if self.cancel_event and self.cancel_event.is_set():
                 raise DownloadCancelled()
 
-        options: dict[str, Any] = {
+        output_template = str(output_dir / ((filename + ".%(ext)s") if filename else "%(title)s.%(ext)s"))\n\n        options: dict[str, Any] = {
             "quiet": True,
             "no_warnings": True,
             "noplaylist": True,
             "format": format_id,
-            "outtmpl": str(output_dir / "%(title)s.%(ext)s"),
+            "outtmpl": output_template,
             "progress_hooks": [hook],
         }
 
