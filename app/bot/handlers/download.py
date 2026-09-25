@@ -111,7 +111,8 @@ async def quality_callback(query: CallbackQuery) -> None:
                     caption=caption,
                 )
 
-            await status.edit_text("✅ Download, processing, and upload complete.")
+            token = create_processing(file_path, user_id)
+            await status.edit_text("✅ Upload complete.\n\nChoose a media-processing action:", reply_markup=processing_keyboard(token))
 
         except DownloadCancelled:
             await status.edit_text("🛑 Download cancelled.")
