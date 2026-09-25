@@ -9,11 +9,12 @@ from aiogram import Router
 from aiogram.types import CallbackQuery, FSInputFile
 
 from app.bot.keyboards.download import cancel_download_keyboard
+from app.bot.keyboards.processing import processing_keyboard
 from app.config.settings import settings
 from app.download.engine import DownloadEngine
 from app.download.jobs import DownloadCancelled, create_job, get_job, remove_job
 from app.media.ffmpeg import split_media
-from app.media.session import pop_selection
+from app.media.session import create_processing, pop_selection
 
 router = Router(name="download")
 
