@@ -3,7 +3,7 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 
-def media_keyboard(qualities: list[tuple[str, str]]) -> InlineKeyboardMarkup:
+def media_keyboard(qualities: list[tuple[str, str]], filename_callback: str) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     quality_row: list[InlineKeyboardButton] = []
     for label, callback_data in qualities:
@@ -15,7 +15,7 @@ def media_keyboard(qualities: list[tuple[str, str]]) -> InlineKeyboardMarkup:
         rows.append(quality_row)
 
     rows.extend([
-        [InlineKeyboardButton(text="✏️ Custom Filename", callback_data="media:filename")],
+        [InlineKeyboardButton(text="✏️ Custom Filename", callback_data=filename_callback)],
         [
             InlineKeyboardButton(text="📸 Screenshots", callback_data="media:screenshots"),
             InlineKeyboardButton(text="✂️ Trim", callback_data="media:trim"),
