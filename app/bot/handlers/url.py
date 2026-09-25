@@ -8,6 +8,7 @@ from aiogram.types import Message
 from app.bot.keyboards.media import media_keyboard
 
 from app.media.resolver import MediaResolver
+from app.media.session import create_selection
 
 router = Router(name="url")
 _URL_RE = re.compile(r"https?://[^\s<>]+", re.IGNORECASE)
@@ -50,5 +51,9 @@ async def url_handler(message: Message) -> None:
     if info.uploader:
         details.append(f"👤 Uploader: {info.uploader}")
     details += ["", "Available qualities:", quality_text]
-    quality_buttons = [(f"{height}p", f"quality:{next(f.format_id for f in info.formats if f.has_video and f.height == height)}") for height in sorted({f.height for f in info.formats if f.has_video and f.height}, reverse=True)]
+    quality_buttons = []
+    for height in sorted({f.height for f in info.formats if f.has_video and f.height}, reverse=True)[:12]:
+        fmt = next(f for f in info.formats if f.has_video and f.height == height)
+        token = create_selection(url, fmt.format_id)
+        quality_buttons.append((f"{height}p", f"quality:{token}"))
     await status.edit_text("\\n".join(details), reply_markup=media_keyboard(quality_buttons))
