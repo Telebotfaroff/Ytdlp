@@ -84,6 +84,7 @@ class DownloadEngine:
         url: str,
         format_id: str,
         output_dir: Path | None = None,
+        filename: str | None = None,
     ) -> Path:
         return await asyncio.to_thread(
             self._download_sync,
