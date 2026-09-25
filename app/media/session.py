@@ -8,6 +8,7 @@ from uuid import uuid4
 class MediaSelection:
     url: str
     format_id: str
+    filename: str | None = None
 
 @dataclass(frozen=True)
 class ProcessingSelection:
@@ -17,9 +18,9 @@ class ProcessingSelection:
 _SELECTIONS: dict[str, MediaSelection] = {}
 _PROCESSING: dict[str, ProcessingSelection] = {}
 
-def create_selection(url: str, format_id: str) -> str:
+def create_selection(url: str, format_id: str, filename: str | None = None) -> str:
     token = uuid4().hex[:12]
-    _SELECTIONS[token] = MediaSelection(url, format_id)
+    _SELECTIONS[token] = MediaSelection(url, format_id, filename)
     return token
 
 def pop_selection(token: str) -> MediaSelection | None:
