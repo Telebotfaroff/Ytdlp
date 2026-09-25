@@ -5,3 +5,6 @@ aiohttp>=3.10,<4
 pyrogram>=2.0,<3
 tgcrypto>=1.2,<2
 Eporner-API>=2.2,<3
+unofficial-api-for-pornhub>=5.4,<6
+unofficial-api-for-missav>=2.6,<3
+unofficial-api-for-xhamster>=2.6,<3
