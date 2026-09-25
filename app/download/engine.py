@@ -90,7 +90,7 @@ class DownloadEngine:
         }
 
         aria2c = shutil.which("aria2c")
-        if aria2c and settings.aria2_connections > 1:
+        if settings.aria2_enabled and aria2c and settings.aria2_connections > 1:
             options["external_downloader"] = aria2c
             options["external_downloader_args"] = {
                 "aria2c": [
@@ -106,8 +106,10 @@ class DownloadEngine:
                 settings.aria2_split,
                 settings.aria2_max_concurrent,
             )
-        elif settings.aria2_connections > 1:
+        elif settings.aria2_enabled and settings.aria2_connections > 1:
             logger.info("aria2c unavailable; using yt-dlp native downloader")
+        else:
+            logger.info("Using yt-dlp native downloader so progress hooks report live speed/progress")
 
         try:
             with yt_dlp.YoutubeDL(options) as ydl:
