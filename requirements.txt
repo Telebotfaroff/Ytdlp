@@ -1,0 +1,2 @@
+# Step 1: no runtime dependencies yet.
+# Telegram, yt-dlp, aria2c, FFmpeg and upload dependencies are added in later steps.
