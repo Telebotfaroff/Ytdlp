@@ -3,13 +3,13 @@
 import asyncio
 
 from aiogram import Bot
-from aiogram.client.session.aiohttp import AiohttpSession
-from aiogram.client.telegram import TelegramAPIServer
 from dotenv import load_dotenv
+from pyrogram import Client
 
 from app.bot.dispatcher import create_dispatcher
-from app.media.cleanup import cleanup_runtime_storage
 from app.config.settings import settings
+from app.media.cleanup import cleanup_runtime_storage
+from app.upload.telegram import TelegramUploader, set_telegram_uploader
 
 
 async def main() -> None:
@@ -17,14 +17,22 @@ async def main() -> None:
     settings.prepare_directories()
 
     if not settings.bot_token:
-        raise RuntimeError("BOT_TOKEN is not configured. Set it in the environment or .env file.")
+        raise RuntimeError("BOT_TOKEN is not configured.")
+    if not settings.telegram_api_id or not settings.telegram_api_hash:
+        raise RuntimeError("TELEGRAM_API_ID and TELEGRAM_API_HASH are required for Pyrogram.")
 
-    api = TelegramAPIServer.from_base(
-        settings.telegram_api_base,
-        is_local=settings.telegram_api_is_local,
+    pyrogram_client = Client(
+        "yt_dlp_bot",
+        api_id=settings.telegram_api_id,
+        api_hash=settings.telegram_api_hash,
+        bot_token=settings.bot_token,
+        workdir=str(settings.temp_dir),
     )
-    session = AiohttpSession(api=api)
-    bot = Bot(token=settings.bot_token, session=session)
+
+    await pyrogram_client.start()
+    set_telegram_uploader(TelegramUploader(pyrogram_client))
+
+    bot = Bot(token=settings.bot_token)
     dispatcher = create_dispatcher()
     cleanup_task = asyncio.create_task(_cleanup_loop())
 
@@ -35,6 +43,7 @@ async def main() -> None:
         cleanup_task.cancel()
         await asyncio.gather(cleanup_task, return_exceptions=True)
         await bot.session.close()
+        await pyrogram_client.stop()
 
 
 async def _cleanup_loop() -> None:
