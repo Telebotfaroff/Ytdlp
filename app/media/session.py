@@ -35,3 +35,9 @@ def get_processing(token: str) -> ProcessingSelection | None:
 
 def pop_processing(token: str) -> ProcessingSelection | None:
     return _PROCESSING.pop(token, None)
+
+def get_user_processing(user_id: int) -> tuple[str, ProcessingSelection | None]:
+    for token, selection in reversed(list(_PROCESSING.items())):
+        if selection.user_id == user_id:
+            return token, selection
+    return "", None
